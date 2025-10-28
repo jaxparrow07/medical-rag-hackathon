@@ -11,6 +11,7 @@ pdfplumber==0.10.3
 # Vector DB & Embeddings
 chromadb==0.4.18
 sentence-transformers==2.2.2
+huggingface-hub==0.16.4
 
 # LLM APIs
 google-generativeai==0.3.1
