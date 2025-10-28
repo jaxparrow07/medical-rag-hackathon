@@ -16,6 +16,7 @@ class LocalEmbedder:
         
         self.model = SentenceTransformer(model_name, device=device)
         self.model.max_seq_length = 512
+        self.model_name = model_name  # Store model name for later use
         
     def embed_documents(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """Embed documents in batches for GPU efficiency with normalization"""
@@ -31,7 +32,7 @@ class LocalEmbedder:
     def embed_query(self, query: str) -> List[float]:
         """Embed single query with normalization and query prefix"""
         # Add query instruction for BGE models (improves retrieval)
-        if "bge" in self.model._model_card_data.model_id.lower():
+        if "bge" in self.model_name.lower():
             query = f"Represent this query for searching medical information: {query}"
         
         embedding = self.model.encode(

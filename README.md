@@ -1,16 +1,19 @@
 # Medical RAG System
 
-A Retrieval-Augmented Generation (RAG) system for medical question answering using local embeddings and Gemini 2.5 Flash.
+A Retrieval-Augmented Generation (RAG) system for medical question answering using local embeddings and advanced LLMs (DeepSeek R1 or Gemini).
 
 ## Features
 
 - 📚 PDF document processing and chunking
 - 🔍 Local embeddings with BGE-base model
 - 💾 Persistent ChromaDB vector storage
-- 🤖 Answer generation with Gemini 2.5 Flash
+- 🤖 Multiple LLM providers:
+  - **DeepSeek R1** via OpenRouter (FREE tier available)
+  - **Gemini 2.0 Flash** (Google AI)
 - 📝 Automatic citation generation
 - ⚡ Query spell correction and expansion
 - 🌐 FastAPI REST API
+- 🛡️ Anti-hallucination measures
 
 ## Setup
 
@@ -28,12 +31,39 @@ Copy `.env.example` to `.env` and add your API key:
 copy .env.example .env
 ```
 
-Edit `.env` and add your Gemini API key:
+Edit `.env` and add your API key(s):
+
+**Option A: OpenRouter (Recommended - FREE DeepSeek R1)**
 ```
-GEMINI_API_KEY=your_actual_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+Get your key from: https://openrouter.ai/keys
+
+**Option B: Gemini**
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+Get your key from: https://makersuite.google.com/app/apikey
+
+### 2b. Choose Your LLM Provider
+
+In `src/api.py`, the default is set to OpenRouter with DeepSeek R1:
+
+```python
+# Default: OpenRouter + DeepSeek R1 (FREE)
+citation_gen = CitationGenerator(
+    model="deepseek/deepseek-r1-0528:free",
+    provider="openrouter"
+)
 ```
 
-Get your API key from: https://makersuite.google.com/app/apikey
+To use Gemini instead, change to:
+```python
+citation_gen = CitationGenerator(
+    model="gemini-2.0-flash-exp",
+    provider="gemini"
+)
+```
 
 ### 3. Add PDF Documents
 
@@ -119,8 +149,20 @@ rag-model/
 ## Models Used
 
 - **Embeddings**: BAAI/bge-base-en-v1.5 (335MB, runs locally)
-- **LLM**: Gemini 2.5 Flash (API-based)
+- **LLM Options**:
+  - **DeepSeek R1** via OpenRouter (FREE tier, recommended)
+  - **Gemini 2.0 Flash** via Google AI
 - **Vector DB**: ChromaDB (embedded, no separate service needed)
+
+## LLM Provider Comparison
+
+| Feature | DeepSeek R1 (OpenRouter) | Gemini 2.0 Flash |
+|---------|--------------------------|------------------|
+| **Cost** | FREE tier available | FREE tier with limits |
+| **Speed** | ~2-3s per response | ~1-2s per response |
+| **Quality** | Excellent reasoning | Excellent general |
+| **Setup** | Get key from openrouter.ai | Get key from Google AI |
+| **Medical Focus** | Strong analytical | Strong general knowledge |
 
 ## Example Queries
 
@@ -132,9 +174,39 @@ What are the risk factors for heart disease?
 How to diagnose asthma?
 ```
 
+## Testing
+
+### Test DeepSeek Integration
+
+```powershell
+python test_deepseek.py
+```
+
+This will test both OpenRouter (DeepSeek R1) and optionally Gemini if configured.
+
+### Test API
+
+```powershell
+python test_rag.py
+```
+
 ## Notes
 
 - ChromaDB runs embedded - no separate database service needed
 - First run will download the BGE embedding model (~335MB)
 - All data persists in `data/vectordb/` directory
 - Answers include citations from source documents
+- **Anti-hallucination features**:
+  - Strict prompt engineering to prevent extrapolation
+  - Low temperature (0.1) for deterministic responses
+  - Post-processing to remove source mentions
+  - Confidence scoring based on answer certainty
+
+## Why DeepSeek R1?
+
+DeepSeek R1 is recommended because:
+- ✅ **FREE tier** available on OpenRouter
+- ✅ Strong **reasoning capabilities** for medical questions
+- ✅ Better at following **strict instructions** (no hallucination)
+- ✅ Good at **staying within context** boundaries
+- ✅ Accessible via simple REST API

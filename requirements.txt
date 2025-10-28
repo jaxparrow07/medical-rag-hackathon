@@ -15,7 +15,7 @@ huggingface-hub>=0.20.0
 
 # LLM APIs
 google-generativeai>=0.3.0
-openai>=1.3.0
+openai>=1.3.0  # Used for both OpenAI and OpenRouter
 
 # Text Processing
 rapidfuzz==3.5.2

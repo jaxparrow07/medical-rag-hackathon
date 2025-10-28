@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from embedding import LocalEmbedder
 from vectordb import VectorStore
@@ -14,7 +18,20 @@ app = FastAPI(title="Medical RAG API")
 embedder = LocalEmbedder()
 vector_store = VectorStore()
 query_processor = QueryProcessor()
-citation_gen = CitationGenerator(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Initialize with OpenRouter DeepSeek R1 (default) or Gemini
+# Set OPENROUTER_API_KEY in .env for DeepSeek
+# Set GEMINI_API_KEY in .env for Gemini
+citation_gen = CitationGenerator(
+    model="qwen/qwen3-235b-a22b:free",
+    provider="openrouter"
+)
+
+# Alternative: Use Gemini instead
+# citation_gen = CitationGenerator(
+#     model="gemini-2.0-flash-exp",
+#     provider="gemini"
+# )
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1)
