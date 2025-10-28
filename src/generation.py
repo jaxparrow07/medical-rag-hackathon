@@ -98,6 +98,11 @@ class CitationGenerator:
             # Add confidence if enabled in config
             if LLM_CONFIG['assess_confidence']:
                 result['confidence'] = self._assess_confidence(answer, contexts)
+
+            if DEBUG_CONFIG['log_llm_calls']:
+                print("-" * 50)
+                print(f"Prompt used: {prompt[:100]}...\n")
+                print(f"Generated answer: {answer}...")
             
             return result
             
@@ -131,12 +136,24 @@ class CitationGenerator:
         """Call Gemini API with config settings"""
         response = self.model.generate_content(
             prompt,
-            safety_settings={
-                'HARASSMENT': 'block_none',
-                'HATE_SPEECH': 'block_none',
-                'SEXUALLY_EXPLICIT': 'block_none',
-                'DANGEROUS_CONTENT': 'block_none'
+            safety_settings=[
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_NONE",
             }
+            ],
         )
         return response.text
     

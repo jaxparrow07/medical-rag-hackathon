@@ -33,17 +33,17 @@ EMBEDDING_CONFIG = {
 # ============================================================================
 LLM_CONFIG = {
     # Provider Selection
-    'provider': 'openrouter',  # Options: 'openrouter', 'gemini'
+    'provider': 'gemini',  # Options: 'openrouter', 'gemini'
     
     # Model Selection by Provider
-    'openrouter_model': 'qwen/qwen3-235b-a22b:free',  # FREE options: deepseek/deepseek-r1, meta-llama/llama-3.2-3b-instruct:free
+    'openrouter_model': 'tngtech/deepseek-r1t2-chimera:free',  # FREE options: z-ai/glm-4.5-air:free, deepseek/deepseek-r1, meta-llama/llama-3.2-3b-instruct:free
     'gemini_model': 'gemini-2.0-flash',  # Options: gemini-2.0-flash-exp, gemini-1.5-pro
     
     # Generation Parameters (for accuracy vs creativity)
     'temperature': 0.15,  # 0.0-0.3 (factual), 0.4-0.7 (balanced), 0.8-1.0 (creative)
     'top_p': 0.8,  # 0.8-0.9 (focused), 0.9-0.95 (balanced), 0.95-1.0 (diverse)
     'top_k': 20,  # 10-20 (focused), 20-40 (balanced), 40-100 (diverse)
-    'max_output_tokens': 1024,
+    'max_output_tokens': 2048,  # Max tokens in response
     
     # Response Quality
     'enable_source_cleaning': True,  # Remove leaked source citations
@@ -119,9 +119,9 @@ If the context discusses potential risks, side effects, or precautions, weave th
 
 Structure your response with simple headings only when the answer covers multiple distinct topics that would genuinely benefit from separation. Otherwise, write in flowing paragraphs that read naturally from start to finish.
 
-If the provided context doesn't contain enough information to fully answer the question, be direct about it. Say something like "The available information doesn't provide details about this aspect" rather than making assumptions or filling gaps with general knowledge.
+Use line breaks whenever needed to separate text blocks.
 
-CRITICAL: You must complete your entire response. Never stop mid-sentence or mid-explanation. If the answer requires multiple paragraphs, write all of them fully. Ensure every thought is finished, every explanation is complete, and the response ends naturally at a proper conclusion. Do not truncate or leave any information incomplete.
+CRITICAL: Always talk in a professional manner to convey information in a simple way. Do not ever mentioned that you have been given information or data. TALK CASUALLY. You must complete your entire response. Never stop mid-sentence or mid-explanation. If the answer requires multiple paragraphs, write all of them fully. Ensure every thought is finished, every explanation is complete, and the response ends naturally at a proper conclusion. Do not truncate or leave any information incomplete.
 
 Medical Context:
 {context}
@@ -138,9 +138,9 @@ Your Response:""",
 # RETRIEVAL CONFIGURATION
 # ============================================================================
 RETRIEVAL_CONFIG = {
-    'top_k': 5,  # Number of contexts to retrieve (3-10)
-    'similarity_threshold': 0.3,  # Minimum similarity score (0.0-1.0)
-    'rerank': False,  # Enable cross-encoder reranking (slower but more accurate)
+    'top_k': 3,  # Number of contexts to retrieve (3-10)
+    'similarity_threshold': 0.6,  # Minimum similarity score (0.0-1.0)
+    'rerank': True,  # Enable cross-encoder reranking (slower but more accurate)
     'diversity_penalty': 0.0,  # 0.0 (no penalty) to 0.5 (diverse results)
 }
 
@@ -176,7 +176,7 @@ PRESETS = {
             'matmul_precision': 'high',
         },
         'llm': {
-            'temperature': 0.1,
+            'temperature': 0.2,
             'top_p': 0.8,
             'top_k': 20,
         }
@@ -203,7 +203,7 @@ PRESETS = {
 # ============================================================================
 # ACTIVE PRESET
 # ============================================================================
-ACTIVE_PRESET = 'maximum_accuracy'  # Options: 'maximum_accuracy', 'balanced', 'maximum_speed'
+ACTIVE_PRESET = 'balanced'  # Options: 'maximum_accuracy', 'balanced', 'maximum_speed'
 
 # Apply preset to configs
 if ACTIVE_PRESET in PRESETS:
