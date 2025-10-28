@@ -11,6 +11,7 @@ __pycache__/
 *.zip
 data/vectordb/*
 data/raw_pdfs/*
+data/*.pdf
 
 # Distribution / packaging
 .Python
