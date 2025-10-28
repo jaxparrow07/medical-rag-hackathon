@@ -32,19 +32,21 @@ EMBEDDING_CONFIG = {
 # LLM GENERATION CONFIGURATION
 # ============================================================================
 LLM_CONFIG = {
+
+
     # Provider Selection
-    'provider': 'gemini',  # Options: 'openrouter', 'gemini'
+    'provider': 'openrouter',  # Options: 'openrouter', 'gemini'
     
     # Model Selection by Provider
-    'openrouter_model': 'tngtech/deepseek-r1t2-chimera:free',  # FREE options: z-ai/glm-4.5-air:free, deepseek/deepseek-r1, meta-llama/llama-3.2-3b-instruct:free
+    'openrouter_model': 'minimax/minimax-m2:free',  # FREE options: z-ai/glm-4.5-air:free, deepseek/deepseek-r1, meta-llama/llama-3.2-3b-instruct:free
     'gemini_model': 'gemini-2.0-flash',  # Options: gemini-2.0-flash-exp, gemini-1.5-pro
     
-    # Generation Parameters (for accuracy vs creativity)
-    'temperature': 0.15,  # 0.0-0.3 (factual), 0.4-0.7 (balanced), 0.8-1.0 (creative)
-    'top_p': 0.8,  # 0.8-0.9 (focused), 0.9-0.95 (balanced), 0.95-1.0 (diverse)
-    'top_k': 20,  # 10-20 (focused), 20-40 (balanced), 40-100 (diverse)
-    'max_output_tokens': 2048,  # Max tokens in response
-    
+    # Generation Parameters (for accuracy vs creativity
+    'temperature': 0.3,  # Increased for more creative reasoning
+    'top_p': 0.85,  # Increased for more varied responses
+    'top_k': 40,  # Increased token sampling
+    'max_output_tokens': 1000,  # Ensure complete explanations
+
     # Response Quality
     'enable_source_cleaning': True,  # Remove leaked source citations
     'assess_confidence': True,  # Calculate answer confidence score
@@ -112,7 +114,6 @@ Detailed Response:""",
 Core Instructions:
 
 Answer using only the information explicitly stated in the medical context below. Write in complete paragraphs as if you're explaining something to a friend or family member, using natural flowing sentences rather than bullet points or numbered lists. When the context mentions side effects, medications, dosages, or warnings, include these details clearly in your explanation without downplaying their importance.
-
 Use everyday language whenever possible. If you must use a medical term, briefly explain what it means in plain English within the same sentence. Never reference sources by number or mention where information came from. Simply present the information as unified knowledge.
 
 If the context discusses potential risks, side effects, or precautions, weave these naturally into your explanation using phrases like "it's important to note that" or "patients should be aware that" rather than creating separate warning sections. When medications are mentioned, include relevant details about how they work, when they're used, and any important considerations the context provides.
@@ -129,19 +130,97 @@ Medical Context:
 Question: {query}
 
 Your Response:""",
+
+    'medical_exam_prompt': """You are MedAssist, a medical education AI specializing in helping students master medical concepts and exam questions. You provide clear, accurate explanations that combine clinical reasoning with factual knowledge.
+
+## Your Approach
+
+When answering medical questions, you integrate information from your knowledge base with standard medical principles to provide comprehensive explanations. You think through problems systematically, just as a clinician would approach a case.
+
+## Response Format
+
+For multiple-choice questions, structure your answer as:
+
+**Analysis:**
+Identify the key clinical features, lab values, or concepts presented. Recognize the pattern or syndrome being described.
+
+**Clinical Reasoning:**
+Explain the underlying pathophysiology or mechanism. Connect the findings to form a logical diagnostic or therapeutic conclusion.
+
+**Answer: [Letter]. [Option Text]**
+
+**Explanation:**
+Clearly state why this answer is correct and briefly address why other options don't fit the clinical picture.
+
+For conceptual questions, provide a clear explanation that builds from fundamentals to the specific answer.
+
+## Using Available Information
+
+{context}
+
+The information above may provide relevant details. Integrate this naturally with established medical knowledge to give complete, accurate answers. If the available information is limited, apply standard medical principles and clinical reasoning to address the question thoroughly.
+
+## Guidelines
+
+- Write in clear, professional language appropriate for medical education
+- Use short paragraphs separated by line breaks for readability  
+- Include relevant medical terminology but ensure explanations are understandable
+- When discussing mechanisms, explain the pathophysiology clearly
+- For treatment questions, note standard approaches and rationale
+- Always complete your full explanation - never stop mid-thought
+
+## Critical Rules
+
+- Provide definitive answers based on clinical reasoning and medical knowledge
+- Do NOT refuse to answer due to insufficient context
+- Do NOT say "the information doesn't contain" for standard medical concepts
+- DO apply clinical logic and pattern recognition
+- DO teach the underlying principles, not just facts
+
+Your goal is to help students understand not just WHAT the answer is, but WHY it's correct and HOW to think through similar problems.
+
+---
+
+Question: {query}
+
+Your response:""",
+
+'concise_medical_prompt': """You are a medical education assistant providing clear, brief explanations for medical questions.
+
+## Available Context
+
+{context}
+
+## Instructions
+
+- Provide concise, direct answers without excessive formatting
+- For multiple-choice questions: State the answer, explain why it's correct in 2-3 sentences, then briefly note why other options don't fit
+- Use the context when relevant, but also apply standard medical knowledge
+- Write in short paragraphs with natural flow - no bullet points, no bold headers, no complex structure
+- Get to the point quickly - students need clarity, not lengthy explanations
+- Complete your explanation fully but keep it brief
+
+## Question
+
+{query}
+
+## Your Answer
+
+Provide a short, clear explanation:""",
     
     # Active prompt (selected by key)
-    'active': 'natural_medical_prompt'  # Options: 'main_prompt', 'concise_prompt', 'detailed_prompt'
+    'active': 'concise_medical_prompt'  # Options: 'main_prompt', 'concise_prompt', 'detailed_prompt'
 }
 
 # ============================================================================
 # RETRIEVAL CONFIGURATION
 # ============================================================================
 RETRIEVAL_CONFIG = {
-    'top_k': 3,  # Number of contexts to retrieve (3-10)
-    'similarity_threshold': 0.6,  # Minimum similarity score (0.0-1.0)
-    'rerank': True,  # Enable cross-encoder reranking (slower but more accurate)
-    'diversity_penalty': 0.0,  # 0.0 (no penalty) to 0.5 (diverse results)
+    'top_k': 5,  # Increased to get more context
+    'similarity_threshold': 0.45,  # Lowered - medical terms might not match exactly
+    'rerank': True,  # Keep reranking for accuracy
+    'diversity_penalty': 0.2,  # Moderate diversity to avoid redundancy
+    'context_window': 1500,  # Tokens per retrieved chunk
 }
 
 # ============================================================================
@@ -176,9 +255,9 @@ PRESETS = {
             'matmul_precision': 'high',
         },
         'llm': {
-            'temperature': 0.2,
+            'temperature': 0.35,
             'top_p': 0.8,
-            'top_k': 20,
+            'top_k': 35,
         }
     },
     
