@@ -2,7 +2,8 @@ import google.generativeai as genai
 from typing import List, Dict
 
 class CitationGenerator:
-    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-2.0-flash-exp"):
+        """Initialize with Gemini 2.5 Flash (using 2.0-flash-exp as latest available)"""
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(model)
     

@@ -22,7 +22,9 @@ def setup_rag_database():
     vector_store = VectorStore(persist_dir="./data/vectordb")
     vector_store.add_documents(chunks, embeddings)
     
-    print("\n✓ Database setup complete!")
+    print(f"\n✓ Database setup complete!")
+    print(f"Total documents stored: {vector_store.get_count()}")
+    print(f"Database location: ./data/vectordb")
 
 if __name__ == "__main__":
     setup_rag_database()

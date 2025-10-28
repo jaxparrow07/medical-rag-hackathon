@@ -1,14 +1,15 @@
 import chromadb
-from chromadb.config import Settings
 from typing import List, Dict
+from pathlib import Path
 
 class VectorStore:
     def __init__(self, persist_dir: str = "./data/vectordb"):
         """Initialize ChromaDB with persistence"""
-        self.client = chromadb.Client(Settings(
-            persist_directory=persist_dir,
-            anonymized_telemetry=False
-        ))
+        # Ensure directory exists
+        Path(persist_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Use PersistentClient for automatic persistence
+        self.client = chromadb.PersistentClient(path=persist_dir)
         
         # Create or get collection
         self.collection = self.client.get_or_create_collection(
@@ -48,3 +49,15 @@ class VectorStore:
             'metadatas': results['metadatas'][0],
             'distances': results['distances'][0]
         }
+    
+    def get_count(self) -> int:
+        """Get total number of documents in the collection"""
+        return self.collection.count()
+    
+    def clear(self):
+        """Clear all documents from the collection"""
+        self.client.delete_collection(name="medical_knowledge")
+        self.collection = self.client.get_or_create_collection(
+            name="medical_knowledge",
+            metadata={"hnsw:space": "cosine"}
+        )
