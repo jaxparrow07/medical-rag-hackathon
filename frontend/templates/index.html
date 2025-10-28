@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical RAG Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Animated gradient background -->
+    <div class="gradient-blob"></div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>Medical Assistant</h1>
+            <p class="subtitle">Ask me anything about medical information</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="input-section">
+            <div class="input-wrapper">
+                <textarea 
+                    id="query-input" 
+                    placeholder="Type your medical question here..."
+                    rows="3"
+                ></textarea>
+                <button id="ask-button" class="ask-btn">
+                    <span class="btn-text">Ask</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Answer Section -->
+        <div id="answer-section" class="answer-section hidden">
+            <div class="answer-card">
+                <div class="shimmer-overlay"></div>
+                <h3>Answer</h3>
+                <div id="answer-content" class="answer-content"></div>
+            </div>
+        </div>
+
+        <!-- Context Section -->
+        <div id="context-section" class="context-section hidden">
+            <h3 class="context-title">Retrieved Context</h3>
+            <div id="context-cards" class="context-cards"></div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
