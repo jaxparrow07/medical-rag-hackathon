@@ -44,10 +44,12 @@ class VectorStore:
             include=['documents', 'metadatas', 'distances']
         )
         
+        # Return the full results structure (not unpacked)
+        # This ensures consistency with ChromaDB's return format
         return {
-            'documents': results['documents'][0],
-            'metadatas': results['metadatas'][0],
-            'distances': results['distances'][0]
+            'documents': results['documents'],
+            'metadatas': results['metadatas'],
+            'distances': results['distances']
         }
     
     def get_count(self) -> int:

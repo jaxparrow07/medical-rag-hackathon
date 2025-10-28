@@ -49,13 +49,13 @@ def query_rag_system(query: str, top_k: int = 5):
     print(f"Searching for top {top_k} relevant documents...")
     search_results = vector_store.search(query_embedding, top_k)
     
-    contexts = [
-        {
-            'text': doc,
-            'metadata': meta
-        }
-        for doc, meta in zip(search_results['documents'], search_results['metadatas'])
-    ]
+    contexts = []
+    if search_results['documents'] and len(search_results['documents']) > 0:
+        for doc, meta in zip(search_results['documents'][0], search_results['metadatas'][0]):
+            contexts.append({
+                'text': doc,
+                'metadata': meta
+            })
     
     print(f"Found {len(contexts)} relevant contexts\n")
     

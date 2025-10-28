@@ -46,11 +46,7 @@ def test_deepseek_generation():
     result = generator.generate_answer(query, contexts)
     
     print(f"Answer:\n{result['answer']}\n")
-    print(f"Confidence: {result['confidence']:.2f}\n")
     print(f"Number of contexts used: {len(result['contexts'])}\n")
-    print("Citations:")
-    for i, citation in enumerate(result['citations'], 1):
-        print(f"  [{i}] {citation}")
     print("=" * 70)
 
 def test_gemini_comparison():

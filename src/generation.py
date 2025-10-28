@@ -1,29 +1,34 @@
 import google.generativeai as genai
 from typing import List, Dict, Literal
 import os
+import re
 from openai import OpenAI
+
+try:
+    from .config import LLM_CONFIG, SYSTEM_PROMPTS, DEBUG_CONFIG
+except ImportError:
+    from config import LLM_CONFIG, SYSTEM_PROMPTS, DEBUG_CONFIG
 
 class CitationGenerator:
     def __init__(
         self, 
         api_key: str = None,
-        model: str = "qwen/qwen3-235b-a22b:free",
-        provider: Literal["openrouter", "gemini"] = "openrouter"
+        model: str = None,
+        provider: Literal["openrouter", "gemini"] = None
     ):
         """
-        Initialize the citation generator with support for multiple LLM providers.
+        Initialize with config-driven settings
         
         Args:
             api_key: API key for the provider (uses env vars if None)
-            model: Model identifier
-                - OpenRouter: "deepseek/deepseek-r1" (default, FREE)
-                - Gemini: "gemini-2.0-flash-exp"
-            provider: "openrouter" or "gemini"
+            model: Model identifier (uses config default if None)
+            provider: "openrouter" or "gemini" (uses config default if None)
         """
-        self.provider = provider
-        self.model_name = model
+        # Use config defaults if not provided
+        self.provider = provider or LLM_CONFIG['provider']
         
-        if provider == "openrouter":
+        if self.provider == "openrouter":
+            self.model_name = model or LLM_CONFIG['openrouter_model']
             self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
             if not self.api_key:
                 raise ValueError("OPENROUTER_API_KEY not found in environment or parameters")
@@ -38,35 +43,42 @@ class CitationGenerator:
                 }
             )
             
-        elif provider == "gemini":
+        elif self.provider == "gemini":
+            self.model_name = model or LLM_CONFIG['gemini_model']
             self.api_key = api_key or os.getenv("GEMINI_API_KEY")
             if not self.api_key:
                 raise ValueError("GEMINI_API_KEY not found in environment or parameters")
             genai.configure(api_key=self.api_key)
             
-            # Configure for more deterministic outputs
+            # Configure for more deterministic outputs using config
             generation_config = genai.GenerationConfig(
-                temperature=0.1,
-                top_p=0.8,
-                top_k=20,
-                max_output_tokens=1024,
+                temperature=LLM_CONFIG['temperature'],
+                top_p=LLM_CONFIG['top_p'],
+                top_k=LLM_CONFIG['top_k'],
+                max_output_tokens=LLM_CONFIG['max_output_tokens'],
             )
             
             self.model = genai.GenerativeModel(
-                model,
+                self.model_name,
                 generation_config=generation_config
             )
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            raise ValueError(f"Unsupported provider: {self.provider}")
+        
+        if DEBUG_CONFIG['verbose']:
+            print(f"Initialized {self.provider} with model: {self.model_name}")
+            print(f"Temperature: {LLM_CONFIG['temperature']}, Top-p: {LLM_CONFIG['top_p']}")
     
     def generate_answer(self, query: str, contexts: List[Dict]) -> Dict:
-        """Generate answer with citations"""
-        
-        # Format contexts with citations
+        """Generate answer with config-driven prompt"""
         context_text = self.format_contexts(contexts)
         
-        # Create the prompt
-        prompt = self._create_prompt(query, context_text)
+        # Get active prompt template from config
+        prompt_template = SYSTEM_PROMPTS[SYSTEM_PROMPTS['active']]
+        prompt = prompt_template.format(context=context_text, query=query)
+        
+        if DEBUG_CONFIG['log_llm_calls']:
+            print(f"Generating answer for: {query[:100]}...")
         
         try:
             if self.provider == "openrouter":
@@ -74,58 +86,40 @@ class CitationGenerator:
             else:  # gemini
                 answer = self._call_gemini(prompt)
             
-            # Post-process to ensure no source citations leaked through
-            answer = self._clean_source_mentions(answer)
+            # Post-process if enabled in config
+            if LLM_CONFIG['enable_source_cleaning']:
+                answer = self._clean_source_mentions(answer)
             
-            return {
+            result = {
                 'answer': answer,
-                'contexts': [ctx['text'] for ctx in contexts],
-                'citations': [ctx['metadata']['citation'] for ctx in contexts],
-                'confidence': self._assess_confidence(answer, contexts)
+                'contexts': [ctx['text'] for ctx in contexts]
             }
+            
+            # Add confidence if enabled in config
+            if LLM_CONFIG['assess_confidence']:
+                result['confidence'] = self._assess_confidence(answer, contexts)
+            
+            return result
+            
         except Exception as e:
+            if DEBUG_CONFIG['verbose']:
+                print(f"Error generating answer: {e}")
             return {
-                'answer': f"I apologize, but I encountered an error generating the response: {str(e)}",
-                'contexts': [],
-                'citations': [],
-                'confidence': 0.0
+                'answer': f"I apologize, but I encountered an error: {str(e)}",
+                'contexts': []
             }
-    
-    def _create_prompt(self, query: str, context_text: str) -> str:
-        """Create the instruction prompt"""
-        return f"""You are a medical information assistant. Your task is to provide clear, accurate answers based STRICTLY on the provided medical context.
-
-**CRITICAL RULES:**
-1. Answer ONLY using information explicitly stated in the context below
-2. DO NOT mention "Source 1", "Source 2", etc. in your response
-3. DO NOT add any information, assumptions, or inferences beyond what's in the context
-4. DO NOT extrapolate, generalize, or make logical leaps
-5. If information is insufficient or unclear, explicitly state: "The provided information does not contain enough details to answer this fully."
-6. Use simple, clear language that a non-medical person can understand
-7. Avoid medical jargon where possible; if technical terms are necessary, briefly explain them
-8. Structure your answer in short, clear sentences
-
-**Medical Context:**
-{context_text}
-
-**Question:** {query}
-
-**Your Answer (clear, accessible, fact-based only):**"""
     
     def _call_openrouter(self, prompt: str) -> str:
-        """Call OpenRouter API using OpenAI SDK"""
+        """Call OpenRouter API with config settings"""
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,  # Low temperature for factual responses
-                top_p=0.8,
-                max_tokens=1024,
+                temperature=LLM_CONFIG['temperature'],
+                top_p=LLM_CONFIG['top_p'],
+                max_tokens=LLM_CONFIG['max_output_tokens']
             )
             
             return response.choices[0].message.content
@@ -134,7 +128,7 @@ class CitationGenerator:
             raise Exception(f"OpenRouter API error: {str(e)}")
     
     def _call_gemini(self, prompt: str) -> str:
-        """Call Gemini API"""
+        """Call Gemini API with config settings"""
         response = self.model.generate_content(
             prompt,
             safety_settings={
@@ -156,9 +150,7 @@ class CitationGenerator:
         return "\n\n".join(formatted)
     
     def _clean_source_mentions(self, text: str) -> str:
-        """Remove any source citations that leaked into the answer"""
-        import re
-        # Remove patterns like [Source X], (Source X), etc.
+        """Remove source citations from answer"""
         patterns = [
             r'\[Source \d+[^\]]*\]',
             r'\(Source \d+[^\)]*\)',
@@ -172,11 +164,10 @@ class CitationGenerator:
         
         # Clean up extra whitespace
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        
         return cleaned
     
     def _assess_confidence(self, answer: str, contexts: List[Dict]) -> float:
-        """Assess confidence based on answer characteristics"""
+        """Assess confidence in answer"""
         uncertainty_phrases = [
             'does not contain',
             'insufficient',
@@ -189,9 +180,7 @@ class CitationGenerator:
         
         answer_lower = answer.lower()
         
-        # Low confidence if uncertainty phrases are present
         if any(phrase in answer_lower for phrase in uncertainty_phrases):
             return 0.3
         
-        # Medium-high confidence otherwise
         return 0.8
