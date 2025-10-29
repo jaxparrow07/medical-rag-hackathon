@@ -7,7 +7,7 @@ from typing import Literal
 # ============================================================================
 EMBEDDING_CONFIG = {
     # Model Selection
-    'model_name': 'BAAI/bge-base-en-v1.5',  # Options: BAAI/bge-base-en-v1.5, all-MiniLM-L6-v2, pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
+    'model_name': 'pritamdeka/S-PubMedBert-MS-MARCO',  # Options: BAAI/bge-base-en-v1.5, all-MiniLM-L6-v2, pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
     'max_seq_length': 512,
     
     # Precision Settings (for accuracy vs speed trade-off)
@@ -114,17 +114,58 @@ Answer:""",
 ## Your Answer
 
 Provide a short, clear explanation:""",
+
+'concise_medical_prompt2': """You are a medical education assistant providing clear, accurate explanations for medical questions and clinical scenarios.
+
+## Available Context
+
+{context}
+
+## Instructions
+
+When answering, think through the problem systematically:
+
+**For straightforward questions:** State the answer directly and explain why in 2-3 sentences. Briefly note why other options are incorrect.
+
+**For complex clinical scenarios:** Work through the case step-by-step:
+1. Identify the key clinical features (age, symptoms, labs, timeline, risk factors)
+2. Consider what diagnosis or management these findings suggest
+3. Explain your reasoning by connecting the findings to the underlying pathophysiology or clinical principle
+4. State your answer and why it's most appropriate for this specific patient
+
+Use the provided context when relevant, but integrate it with standard medical knowledge and clinical reasoning. Don't limit yourself to only what's in the context - apply clinical logic and pattern recognition as physicians do.
+
+**Style guidelines:**
+- Write in natural flowing paragraphs, no bullet points or bold formatting
+- Be concise but complete - explain your thinking without unnecessary detail
+- Use clinical reasoning phrases like "This suggests...", "The combination of... points to...", "Given the presentation..."
+- For time-sensitive or critical findings, note their clinical significance
+- If findings are ambiguous, acknowledge this and explain which diagnosis is most likely based on the available information
+
+**Critical thinking:**
+- Always consider the timeline (acute vs chronic, progression)
+- Weight findings by clinical significance (not all abnormalities are equally important)
+- Think about mechanisms - why would this cause that?
+- For treatment questions, consider the specific patient context (age, comorbidities, contraindications)
+
+## Question
+
+{query}
+
+## Your Answer
+
+Provide a clear, reasoned explanation:""",
     
     # Active prompt (selected by key)
-    'active': 'concise_medical_prompt'  # Options: 'main_prompt', 'concise_prompt', 'detailed_prompt'
+    'active': 'concise_medical_prompt2'  # Options: 'main_prompt', 'concise_prompt', 'detailed_prompt'
 }
 
 # ============================================================================
 # RETRIEVAL CONFIGURATION
 # ============================================================================
 RETRIEVAL_CONFIG = {
-    'top_k': 5,  # Increased to get more context
-    'similarity_threshold': 0.45,  # Lowered - medical terms might not match exactly
+    'top_k': 6,  # Increased to get more context
+    'similarity_threshold': 0.40,  # Lowered - medical terms might not match exactly
     'rerank': True,  # Keep reranking for accuracy
     'diversity_penalty': 0.2,  # Moderate diversity to avoid redundancy
     'context_window': 1500,  # Tokens per retrieved chunk
