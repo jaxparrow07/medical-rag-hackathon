@@ -5,75 +5,180 @@ Run this after setting up the database with setup_database.py
 
 import os
 from dotenv import load_dotenv
-from src.embedding import LocalEmbedder
-from src.vectordb import VectorStore
-from src.query_processor import QueryProcessor
+from src.retrieval import LocalEmbedder
+from src.retrieval import VectorStore
+from src.retrieval import QueryProcessor
 from src.generation import CitationGenerator
+from src.retrieval import QueryReformulator, MultiQueryRetrieval
+from src.retrieval import MedicalReranker
+from src.config import (
+    QUERY_REFORMULATION_CONFIG,
+    RETRIEVAL_CONFIG,
+    EMBEDDING_CONFIG,
+    DEBUG_CONFIG
+)
 
 # Load environment variables
 load_dotenv()
 
-def query_rag_system(query: str, top_k: int = 5):
-    """Query the RAG system and get an answer with citations"""
-    
+def query_rag_system(query: str, top_k: int = None, use_reformulation: bool = None, use_reranking: bool = None):
+    """
+    Query the RAG system with pipeline
+
+    Args:
+        query: User question
+        top_k: Number of results (uses config default if None)
+        use_reformulation: Enable MiniMax query reformulation (uses config if None)
+        use_reranking: Enable cross-encoder reranking (uses config if None)
+
+    Returns:
+        dict with answer, contexts, and metadata
+    """
+
+    # Use config defaults if not specified
+    if top_k is None:
+        top_k = RETRIEVAL_CONFIG.get('final_top_k', 6)
+    if use_reformulation is None:
+        use_reformulation = QUERY_REFORMULATION_CONFIG.get('enabled', True)
+    if use_reranking is None:
+        use_reranking = RETRIEVAL_CONFIG.get('rerank', True)
+
     print(f"\n{'='*80}")
     print(f"Query: {query}")
     print(f"{'='*80}\n")
-    
+
     # 1. Initialize components
-    print("Loading components...")
-    embedder = LocalEmbedder(model_name="BAAI/bge-base-en-v1.5")
+    print("🔧 Loading components...")
+
+    # Embedding model (uses MedCPT from config)
+    embedder = LocalEmbedder()
     vector_store = VectorStore(persist_dir="./data/vectordb")
-    query_processor = QueryProcessor()
-    
-    # Check if API key exists
-    api_key = os.getenv("GEMINI_API_KEY")
+
+    # Optional: Query reformulation with MiniMax
+    if use_reformulation:
+        try:
+            reformulator = QueryReformulator(
+                model=QUERY_REFORMULATION_CONFIG['model']
+            )
+            multi_retriever = MultiQueryRetrieval(reformulator, vector_store, embedder)
+            print("✅ MiniMax query reformulation enabled")
+        except Exception as e:
+            print(f"⚠️  Query reformulation not available: {e}")
+            print("   Falling back to single-query retrieval")
+            use_reformulation = False
+    else:
+        print("ℹ️  Query reformulation disabled")
+
+    # Optional: Cross-encoder reranking
+    if use_reranking:
+        try:
+            reranker = MedicalReranker()
+            print("✅ Cross-encoder reranking enabled")
+        except Exception as e:
+            print(f"⚠️  Reranking not available: {e}")
+            use_reranking = False
+    else:
+        print("ℹ️  Reranking disabled")
+
+    # LLM for answer generation (DeepSeek R1 via OpenRouter)
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY not found in environment variables!")
-    
-    citation_gen = CitationGenerator(api_key=api_key)
-    
-    # 2. Process and correct query
-    print("Processing query...")
-    corrected_query = query_processor.correct_query(query)
-    if corrected_query != query:
-        print(f"Corrected query: {corrected_query}")
-    
-    expanded_query = query_processor.expand_query(corrected_query)
-    
-    # 3. Embed query
-    print("Generating query embedding...")
-    query_embedding = embedder.embed_query(expanded_query)
-    
-    # 4. Retrieve relevant contexts
-    print(f"Searching for top {top_k} relevant documents...")
-    search_results = vector_store.search(query_embedding, top_k)
-    
-    contexts = []
-    if search_results['documents'] and len(search_results['documents']) > 0:
-        for doc, meta in zip(search_results['documents'][0], search_results['metadatas'][0]):
-            contexts.append({
-                'text': doc,
-                'metadata': meta
-            })
-    
-    print(f"Found {len(contexts)} relevant contexts\n")
-    
-    # 5. Generate answer with citations
-    print("Generating answer with Gemini 2.5 Flash...\n")
+        raise ValueError("OPENROUTER_API_KEY not found! Set it in .env")
+
+    citation_gen = CitationGenerator(api_key=api_key, provider="openrouter")
+
+    # 2. Query Processing & Retrieval
+    print("\n📚 Retrieving relevant contexts...")
+
+    if use_reformulation and 'multi_retriever' in locals():
+        # Multi-query retrieval with MiniMax reformulation
+        top_k_per_query = RETRIEVAL_CONFIG.get('top_k_per_query', 10)
+        contexts = multi_retriever.retrieve(
+            query,
+            top_k=top_k * 2,  # Get more for reranking
+            top_k_per_query=top_k_per_query
+        )
+    else:
+        # Single-query retrieval (legacy)
+        query_embedding = embedder.embed_query(query)
+        search_results = vector_store.search(query_embedding, top_k * 2)
+
+        contexts = []
+        if search_results['documents'] and len(search_results['documents']) > 0:
+            for doc, meta, dist in zip(
+                search_results['documents'][0],
+                search_results['metadatas'][0],
+                search_results['distances'][0]
+            ):
+                # Use proper distance-to-similarity conversion
+                similarity = vector_store.distance_to_similarity(dist)
+                contexts.append({
+                    'text': doc,
+                    'metadata': meta,
+                    'similarity': similarity
+                })
+
+    print(f"   Retrieved {len(contexts)} initial results")
+
+    # 3. Reranking (optional)
+    if use_reranking and len(contexts) > 0 and 'reranker' in locals():
+        print("\n🔄 Reranking results with cross-encoder...")
+        contexts = reranker.rerank(query, contexts, top_k=top_k)
+        print(f"   Reranked to top-{top_k} results")
+    else:
+        # Just take top-k without reranking
+        contexts = contexts[:top_k]
+
+    # Filter by similarity threshold
+    similarity_threshold = RETRIEVAL_CONFIG.get('similarity_threshold', 0.4)
+
+    # Debug: Print similarity scores before filtering
+    if DEBUG_CONFIG.get('verbose', True):
+        print(f"\n📊 Similarity scores before filtering (threshold: {similarity_threshold}):")
+        for i, ctx in enumerate(contexts[:10], 1):  # Show first 10
+            sim = ctx.get('similarity', 0)
+            print(f"   {i}. Similarity: {sim:.4f}")
+
+    filtered_contexts = [c for c in contexts if c.get('similarity', 0) >= similarity_threshold]
+
+    # Fallback: If no contexts pass threshold, use top contexts anyway with warning
+    if len(filtered_contexts) == 0 and len(contexts) > 0:
+        print(f"\n⚠️  Warning: No contexts meet similarity threshold {similarity_threshold}")
+        print(f"   Using top {min(3, len(contexts))} contexts anyway (best available)")
+        contexts = contexts[:min(3, len(contexts))]
+    else:
+        contexts = filtered_contexts
+
+    print(f"\n✅ Using {len(contexts)} contexts (similarity >= {similarity_threshold})\n")
+
+    # 4. Generate answer
+    print("🤖 Generating answer with LLM...\n")
     result = citation_gen.generate_answer(query, contexts)
-    
-    # 6. Display results
+
+    # 5. Display results
     print(f"ANSWER:\n{'-'*80}")
     print(result['answer'])
     print(f"\n{'-'*80}")
-    
-    print(f"\nSOURCES USED:")
-    for i, citation in enumerate(result['citations'], 1):
-        print(f"  [{i}] {citation}")
-    
+
+    if 'confidence' in result:
+        confidence_emoji = "🟢" if result['confidence'] > 0.7 else "🟡" if result['confidence'] > 0.4 else "🔴"
+        print(f"\nConfidence: {confidence_emoji} {result['confidence']:.1%}")
+
+    print(f"\nCONTEXTS USED ({len(contexts)}):")
+    for i, ctx in enumerate(contexts, 1):
+        metadata = ctx.get('metadata', {})
+        source = metadata.get('source', 'Unknown')
+        page = metadata.get('page', '?')
+        similarity = ctx.get('similarity', 0)
+        rerank_score = ctx.get('rerank_score', None)
+
+        if rerank_score is not None:
+            print(f"  [{i}] {source}, Page {page} (Sim: {similarity:.2f}, Rerank: {rerank_score:.2f})\n {ctx['text']}\n")
+        else:
+            print(f"  [{i}] {source}, Page {page} (Similarity: {similarity:.2f})\n {ctx['text']}\n")
+
     print(f"\n{'='*80}\n")
-    
+
     return result
 
 

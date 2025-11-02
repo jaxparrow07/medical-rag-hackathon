@@ -7,18 +7,18 @@ from openai import OpenAI
 try:
     from .config import LLM_CONFIG, SYSTEM_PROMPTS, DEBUG_CONFIG
 except ImportError:
-    from config import LLM_CONFIG, SYSTEM_PROMPTS, DEBUG_CONFIG
+    from src.config import LLM_CONFIG, SYSTEM_PROMPTS, DEBUG_CONFIG
 
 class CitationGenerator:
     def __init__(
-        self, 
+        self,
         api_key: str = None,
         model: str = None,
         provider: Literal["openrouter", "gemini"] = None
     ):
         """
         Initialize with config-driven settings
-        
+
         Args:
             api_key: API key for the provider (uses env vars if None)
             model: Model identifier (uses config default if None)
@@ -26,13 +26,13 @@ class CitationGenerator:
         """
         # Use config defaults if not provided
         self.provider = provider or LLM_CONFIG['provider']
-        
+
         if self.provider == "openrouter":
             self.model_name = model or LLM_CONFIG['openrouter_model']
             self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
             if not self.api_key:
                 raise ValueError("OPENROUTER_API_KEY not found in environment or parameters")
-            
+
             # Initialize OpenAI client pointing to OpenRouter
             self.client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
@@ -42,14 +42,14 @@ class CitationGenerator:
                     "X-Title": "Medical RAG System"
                 }
             )
-            
+
         elif self.provider == "gemini":
             self.model_name = model or LLM_CONFIG['gemini_model']
             self.api_key = api_key or os.getenv("GEMINI_API_KEY")
             if not self.api_key:
                 raise ValueError("GEMINI_API_KEY not found in environment or parameters")
             genai.configure(api_key=self.api_key)
-            
+
             # Configure for more deterministic outputs using config
             generation_config = genai.GenerationConfig(
                 temperature=LLM_CONFIG['temperature'],
@@ -57,14 +57,14 @@ class CitationGenerator:
                 top_k=LLM_CONFIG['top_k'],
                 max_output_tokens=LLM_CONFIG['max_output_tokens'],
             )
-            
+
             self.model = genai.GenerativeModel(
                 self.model_name,
                 generation_config=generation_config
             )
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
-        
+
         if DEBUG_CONFIG['verbose']:
             print(f"Initialized {self.provider} with model: {self.model_name}")
             print(f"Temperature: {LLM_CONFIG['temperature']}, Top-p: {LLM_CONFIG['top_p']}")
@@ -79,7 +79,7 @@ class CitationGenerator:
         
         if DEBUG_CONFIG['log_llm_calls']:
             print(f"Generating answer for: {query[:100]}...")
-        
+
         try:
             if self.provider == "openrouter":
                 answer = self._call_openrouter(prompt)
@@ -101,8 +101,7 @@ class CitationGenerator:
 
             if DEBUG_CONFIG['log_llm_calls']:
                 print("-" * 50)
-                print(f"Prompt used: {prompt[:100]}...\n")
-                print(f"Generated answer: {answer}...")
+                print(f"Prompt used: {prompt[:80]}...\n")
             
             return result
             
@@ -126,10 +125,34 @@ class CitationGenerator:
                 top_p=LLM_CONFIG['top_p'],
                 max_tokens=LLM_CONFIG['max_output_tokens']
             )
-            
-            return response.choices[0].message.content
-            
+
+            # Get the message content
+            message = response.choices[0].message
+            content = message.content
+
+            # Debug: Log the type of content if verbose
+            if DEBUG_CONFIG.get('verbose', False):
+                print(f"DEBUG: Response type: {type(content)}")
+                if hasattr(message, '__dict__'):
+                    print(f"DEBUG: Message attributes: {message.__dict__}")
+
+            # Handle different response formats
+            if isinstance(content, dict):
+                # DeepSeek R1 may return structured content
+                return content.get('content', content.get('text', str(content)))
+            elif content is None:
+                # Handle None responses
+                if DEBUG_CONFIG.get('verbose', False):
+                    print(f"DEBUG: Full response: {response}")
+                return ""
+            else:
+                # Standard string response
+                return str(content)
+
         except Exception as e:
+            if DEBUG_CONFIG.get('verbose', False):
+                import traceback
+                print(f"DEBUG: Full traceback:\n{traceback.format_exc()}")
             raise Exception(f"OpenRouter API error: {str(e)}")
     
     def _call_gemini(self, prompt: str) -> str:

@@ -1,17 +1,16 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
-import os
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 from embedding import LocalEmbedder
 from vectordb import VectorStore
 from query_processor import QueryProcessor
 from generation import CitationGenerator
-from config import RETRIEVAL_CONFIG, DEBUG_CONFIG
+from src.config import RETRIEVAL_CONFIG, DEBUG_CONFIG
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI(title="Medical RAG API")
 
@@ -21,7 +20,15 @@ if DEBUG_CONFIG['verbose']:
     print("Loading components...")
 
 embedder = LocalEmbedder()  # Uses EMBEDDING_CONFIG
-vector_store = VectorStore()
+vector_store = VectorStore(embedding_signature=embedder.get_embedding_signature())
+
+try:
+    vector_store.validate_embeddings(embedder)
+except ValueError as exc:
+    if DEBUG_CONFIG['verbose']:
+        print(f"❌ Vector database validation failed: {exc}")
+        print("   Run setup_database.py to rebuild the embeddings with the active configuration.")
+    raise
 query_processor = QueryProcessor()
 citation_gen = CitationGenerator()  # Uses LLM_CONFIG for provider and model
 
@@ -106,7 +113,7 @@ async def query_medical_rag(request: QueryRequest):
 @app.get("/health")
 async def health_check():
     """Health check endpoint with config info"""
-    from config import ACTIVE_PRESET, LLM_CONFIG, EMBEDDING_CONFIG
+    from src.config import ACTIVE_PRESET, LLM_CONFIG, EMBEDDING_CONFIG
     
     return {
         "status": "healthy",
@@ -122,7 +129,7 @@ async def health_check():
 @app.get("/config")
 async def get_config():
     """Get current configuration"""
-    from config import (
+    from src.config import (
         ACTIVE_PRESET, 
         LLM_CONFIG, 
         EMBEDDING_CONFIG, 
@@ -158,10 +165,10 @@ if __name__ == "__main__":
         print("\n" + "="*60)
         print("Starting Medical RAG API Server")
         print("="*60)
-        print(f"Access API at: http://localhost:8000")
-        print(f"API docs at: http://localhost:8000/docs")
-        print(f"Health check: http://localhost:8000/health")
-        print(f"Config info: http://localhost:8000/config")
+        print("Access API at: http://localhost:8000")
+        print("API docs at: http://localhost:8000/docs")
+        print("Health check: http://localhost:8000/health")
+        print("Config info: http://localhost:8000/config")
         print("="*60 + "\n")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
