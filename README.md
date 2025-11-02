@@ -6,13 +6,13 @@ The one we built for the hackathon with no furuther changes is available at the 
 ### Getting started
 Make sure you have python installed ( preferably something older than the latest if you don't want to compile them yourself ).
 
-##### Step 0: Clone this repo
+#### Step 0: Clone this repo
 ```bash
 git clone https://github.com/jaxparrow07/medical-rag-hackathon.git
 cd medical-rag-hackathon
 ```
 
-##### Step 1: Create a Virtual Env and Install requirements - Recommended but optional
+#### Step 1: Create a Virtual Env and Install requirements - Recommended but optional
 ```bash
 python3 -m venv rag
 ```
@@ -24,13 +24,13 @@ This ensures that all the packages are handled by this specific projects virtual
 pip3 install -r requirements.txt
 ```
 
-##### Step 2: Configuring .env files and models
+#### Step 2: Configuring .env files and models
 Copy the contents of `.env.example` into a `.env` file and place your API Keys. If you wish to change to a different model for **query reformulation**, **embedding (not recommended)**, or even **generation**. You can do that in the `src/config.py`. It houses all the important configurations.<br><br> If you encounter any spacy related issues. Try to download this model manually.
 ```bash
 pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_md-0.5.4.tar.gz
 ```
 
-##### Step 3: Creating a vector database of your PDFs
+#### Step 3: Creating a vector database of your PDFs
 Place your PDF files in the `data/raw_pdfs`. By default, this only performs basic text extraction and cleanup. If you want to extract tables you have to configure the `src/config.py` to allow `extract_tables` in the `ENHANCED_FEATURES_CONFIG`.**NOTE: Extracting tables is a slow proces. Use only if important data is represented in tables.**<b>r<br>
 
 Running the following command
@@ -39,7 +39,7 @@ python3 setup_database.py
 ```
 It'll take a while to store them in the vector db. If you see any errors regarding memory. Configure the `config.py` at `EMBEDDING_CONFIG` for the key `batch_size` and try to halve it.
 
-##### Step 4: Running the RAG
+#### Step 4: Running the RAG
 ```bash
 python3 main.py
 ```
