@@ -31,7 +31,9 @@ pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/e
 ```
 
 #### Step 3: Creating a vector database of your PDFs
-Place your PDF files in the `data/raw_pdfs`. By default, this only performs basic text extraction and cleanup. If you want to extract tables you have to configure the `src/config.py` to allow `extract_tables` in the `ENHANCED_FEATURES_CONFIG`.**NOTE: Extracting tables is a slow proces. Use only if important data is represented in tables.**<b>r<br>
+Place your PDF files in the `data/raw_pdfs`. By default, this only performs basic text extraction and cleanup. If you want to extract tables you have to configure the `src/config.py` to allow `extract_tables` in the `ENHANCED_FEATURES_CONFIG`.
+**NOTE: Extracting tables is a slow proces. Use only if important data is represented in tables.**
+<br><br>
 
 Running the following command
 ```bash
